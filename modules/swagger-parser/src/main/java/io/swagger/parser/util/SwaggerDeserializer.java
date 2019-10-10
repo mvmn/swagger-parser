@@ -904,26 +904,7 @@ public class SwaggerDeserializer {
             ExternalDocs docs = externalDocs(externalDocs, location, result);
             impl.setExternalDocs(docs);
 
-            ObjectNode properties = getObject("properties", node, false, location, result);
-            if(properties != null) {
-                Set<String> propertyNames = getKeys(properties);
-                for(String propertyName : propertyNames) {
-                    JsonNode propertyNode = properties.get(propertyName);
-                    if(propertyNode.getNodeType().equals(JsonNodeType.OBJECT)) {
-                        ObjectNode on = (ObjectNode) propertyNode;
-                        Property property = property(on, location, result);
-                        if(property != null) {
-                            if ("array".equals(property.getType()) && !(property instanceof ArrayProperty && ((ArrayProperty) property).getItems() != null)) {
-                                result.missing(location, "items");
-                            }
-                        }
-                        impl.property(propertyName, property);
-                    }
-                    else {
-                        result.invalidType(location, "properties", "object", propertyNode);
-                    }
-                }
-            }
+            inferProperties(node, location, result, impl);
 
             // need to set properties first
             ArrayNode required = getArray("required", node, false, location, result);
@@ -969,6 +950,29 @@ public class SwaggerDeserializer {
         }
 
         return model;
+    }
+    
+    protected void inferProperties(ObjectNode node, String location, ParseResult result, AbstractModel model) {
+        ObjectNode properties = getObject("properties", node, false, location, result);
+        if(properties != null) {
+            Set<String> propertyNames = getKeys(properties);
+            for(String propertyName : propertyNames) {
+                JsonNode propertyNode = properties.get(propertyName);
+                if(propertyNode.getNodeType().equals(JsonNodeType.OBJECT)) {
+                    ObjectNode on = (ObjectNode) propertyNode;
+                    Property property = property(on, location, result);
+                    if(property != null) {
+                        if ("array".equals(property.getType()) && !(property instanceof ArrayProperty && ((ArrayProperty) property).getItems() != null)) {
+                            result.missing(location, "items");
+                        }
+                    }
+                    model.addProperty(propertyName, property);
+                }
+                else {
+                    result.invalidType(location, "properties", "object", propertyNode);
+                }
+            }
+        } 	
     }
 
     public Object extension(JsonNode jsonNode) {
@@ -1044,6 +1048,8 @@ public class SwaggerDeserializer {
                     model.setDescription(value);
                 }
             }
+            
+            inferProperties(node, location, result, model);
 
             return model;
         }
